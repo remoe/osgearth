@@ -31,10 +31,17 @@ namespace
     #else
         static bool s_GLES_SHADERS = false;
     #endif
+
+	#if defined(OSGEARTH_SHADERFACTORY_INTERFACE_BLOCKS)
+		static bool s_GLSL_INTERFACE_BLOCKS = true;
+	#else
+		static bool s_GLSL_INTERFACE_BLOCKS = false;
+	#endif
 }
 
 #define INDENT "    "
 #define RANGE  osgEarth::Registry::instance()->shaderFactory()->getRangeUniformName()
+#define VP_PER_VERTEX "VP_PerVertex"
 
 using namespace osgEarth;
 using namespace osgEarth::ShaderComp;
@@ -60,6 +67,7 @@ namespace
         std::string name;        // name without any array specifiers, etc.
         std::string prec;        // precision qualifier if any
         std::string declaration; // name including array specifiers (for decl)
+		std::string arraySpec;   // array specifier
         int         arraySize;   // 0 if not an array; else array size.
     };
 
@@ -72,6 +80,44 @@ namespace
 	      const std::string& extension = *it;
 	      buf << "#extension "<<extension<< " : enable \n";
 	   }
+	}
+
+	std::string createVarName(const std::string& structName, const std::string& matchName, const Variable& v) 
+	{
+		if (s_GLSL_INTERFACE_BLOCKS) {
+			return Stringify() << structName << "." << v.name << v.arraySpec;
+		}
+		else {
+			return Stringify() << matchName << "_" << v.name << v.arraySpec;
+		}
+	}
+	
+	std::string createVarDecl(const std::string& prefix, const Variable& v)
+	{
+		if (s_GLSL_INTERFACE_BLOCKS) {
+			return Stringify() << v.declaration << v.arraySpec;
+		}
+		else {
+			return Stringify() << v.type << " " << prefix << "_" << v.name << v.arraySpec;
+		}
+	}
+
+	std::string createVertData(const Variables& vars, std::string inout, std::string matchName, std::string structName, std::string arraySpec)
+	{
+		// build the vertex data interface block definition:
+		std::stringstream buf;
+		if (s_GLSL_INTERFACE_BLOCKS) {
+			buf << inout << " " << matchName << " { \n";
+			for (Variables::const_iterator i = vars.begin(); i != vars.end(); ++i)
+				buf << INDENT << i->interp << (i->interp.empty() ? "" : " ") << i->prec << (i->prec.empty() ? "" : " ") << createVarDecl(structName, *i) << "; \n";
+			buf << "} " << structName << arraySpec << ";";
+		}
+		else {
+			for (Variables::const_iterator i = vars.begin(); i != vars.end(); ++i) {
+				buf << i->interp << (i->interp.empty() ? "" : " ") << inout << " " << i->prec << (i->prec.empty() ? "" : " ") << createVarDecl(matchName, *i) << arraySpec << "; \n";
+			}
+		}
+		return buf.str();
 	}
 }
 
@@ -189,7 +235,8 @@ ShaderFactory::createMains(const ShaderComp::FunctionLocationMap&    functions,
                 // check for array
                 if ( p+2 < tokens.size() && tokens[p] == "[" && tokens[p+2] == "]" )
                 {
-                    v.declaration = Stringify() << v.type << " " << v.name << tokens[p] << tokens[p+1] << tokens[p+2];
+                    v.declaration = Stringify() << v.type << " " << v.name;
+					v.arraySpec = Stringify() << tokens[p] << tokens[p + 1] << tokens[p + 2];
                     v.arraySize = as<int>(tokens[p+1], 0);
                 }
                 else
@@ -240,19 +287,9 @@ ShaderFactory::createMains(const ShaderComp::FunctionLocationMap&    functions,
     std::string fs_glsl_version = use400 ? GLSL_400 : GLSL_330;
     std::string gs_glsl_version = use400 ? GLSL_400 : GLSL_330;
 
-    // build the vertex data interface block definition:
-    std::string vertdata;
-    {
-        std::stringstream buf;
-        buf << "VP_PerVertex { \n";
-        for(Variables::const_iterator i = vars.begin(); i != vars.end(); ++i)
-            buf << INDENT << i->interp << (i->interp.empty()?"":" ") << i->prec << (i->prec.empty()?"":" ") << i->declaration << "; \n";
-        buf << "}";
-        vertdata = buf.str();
-    }
 
     // TODO: perhaps optimize later to not include things we don't need in the FS
-    std::string fragdata = vertdata;
+    //std::string fragdata = vertdata;
 
     // Build the vertex shader.
     if ( hasVS )
@@ -273,10 +310,10 @@ ShaderFactory::createMains(const ShaderComp::FunctionLocationMap&    functions,
             buf << i->prec << (i->prec.empty()?"":" ") << i->declaration << "; \n";
         
         buf << "\n// Vertex stage outputs:\n";
-        if ( hasGS || hasTCS )
-            buf << "out " << vertdata << " vp_out; \n";
+		if (hasGS || hasTCS)
+			buf << createVertData(vars, "out", VP_PER_VERTEX, "vp_out", "");
         else
-            buf << "out " << fragdata << " vp_out; \n";
+			buf << createVertData(vars, "out", VP_PER_VERTEX, "vp_out", "");
 
         // prototype functions:
         if ( modelStage || (viewStage && viewStageInVS) || (clipStage && clipStageInVS) )
@@ -384,8 +421,10 @@ ShaderFactory::createMains(const ShaderComp::FunctionLocationMap&    functions,
         if ( hasTCS || hasGS || hasFS )
         {
             // Copy stage globals to output block:
-            for(Variables::const_iterator i = vars.begin(); i != vars.end(); ++i)
-                buf << INDENT << "vp_out." << i->name << " = " << i->name << "; \n";
+			for (Variables::const_iterator i = vars.begin(); i != vars.end(); ++i) 
+			{
+				buf << INDENT << createVarName("vp_out", VP_PER_VERTEX, *i) << " = " << i->name << "; \n";
+			}
         }
 
         buf << "} \n";
@@ -434,12 +473,12 @@ ShaderFactory::createMains(const ShaderComp::FunctionLocationMap&    functions,
         if ( hasVS )
         {
               buf << "\n// TCS stage inputs:\n"
-                 << "in " << vertdata << " vp_in [gl_MaxPatchVertices]; \n";
+				 << createVertData(vars, "in", VP_PER_VERTEX, "vp_in", "[gl_MaxPatchVertices]");
         }
 
         // The TES is mandatory.
         buf << "\n// TCS stage outputs to TES: \n"
-            << "out " << vertdata << " vp_out [gl_MaxPatchVertices]; \n";
+            << createVertData(vars, "out", VP_PER_VERTEX, "vp_out", "[gl_MaxPatchVertices]");
 
         // Stage globals.
         buf << "\n// TCS stage globals \n";
@@ -512,7 +551,7 @@ ShaderFactory::createMains(const ShaderComp::FunctionLocationMap&    functions,
         buf << glMatrixUniforms << "\n";
 
         buf << "\n// TES stage inputs (required):\n"
-            << "in " << vertdata << " vp_in []; \n";
+			<< createVertData(vars, "in", VP_PER_VERTEX, "vp_in", "[]");
         
         // Declare stage globals.
         buf << "\n// TES stage globals: \n";
@@ -521,10 +560,10 @@ ShaderFactory::createMains(const ShaderComp::FunctionLocationMap&    functions,
         
         buf << "\n// TES stage outputs: \n";
         if ( hasGS )
-            buf << "out " << vertdata << " vp_out; \n";
+			buf << createVertData(vars, "out", "VP_PerVertex", "vp_out", "");
         else
-            buf << "out " << fragdata << " vp_out; \n";
-
+			buf << createVertData(vars, "out", "VP_PerVertex", "vp_out", "");
+		
         std::set<std::string> types;
         for(Variables::const_iterator i=vars.begin(); i != vars.end(); ++i)
             types.insert(i->type);
@@ -713,7 +752,7 @@ ShaderFactory::createMains(const ShaderComp::FunctionLocationMap&    functions,
         if ( hasVS || hasTCS || hasTES )
         {
             buf << "\n// Geometry stage inputs:\n"
-                << "in " << vertdata << " vp_in []; \n";
+				<< createVertData(vars, "in", "VP_PerVertex", "vp_in", "[]");
         }        
 
         // Declare stage globals.
@@ -722,7 +761,7 @@ ShaderFactory::createMains(const ShaderComp::FunctionLocationMap&    functions,
             buf << i->declaration << "; \n";
         
         buf << "\n// Geometry stage outputs: \n"
-            << "out " << fragdata << " vp_out; \n";
+			<< createVertData(vars, "out", "VP_PerVertex", "vp_out", "");
 
         if ( geomStage || (viewStage && viewStageInGS) || (clipStage && clipStageInGS) )
         {
@@ -910,7 +949,7 @@ ShaderFactory::createMains(const ShaderComp::FunctionLocationMap&    functions,
         }
 
         buf << "\n// Fragment stage inputs:\n";
-        buf << "in " << fragdata << " vp_in; \n";
+		buf << createVertData(vars, "in", "VP_PerVertex", "vp_in", "");
                 
         buf <<
             "\n// Fragment stage globals:\n";
@@ -954,7 +993,7 @@ ShaderFactory::createMains(const ShaderComp::FunctionLocationMap&    functions,
         
         // Copy input block to stage globals:
         for(Variables::const_iterator i = vars.begin(); i != vars.end(); ++i)
-            buf << INDENT << i->name << " = vp_in." << i->name << "; \n";
+            buf << INDENT << i->name << " = " << createVarName("vp_in", "VP_PerVertex", *i) << "; \n";
 
         buf << INDENT << "vp_Normal = normalize(vp_Normal); \n";
 
