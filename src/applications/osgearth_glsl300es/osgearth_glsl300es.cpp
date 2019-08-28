@@ -44,6 +44,8 @@
 #include <osgEarth/GLUtils>
 #include <osgEarth/Controls>
 
+#include "egl_gw.h"
+
 using namespace osgEarth;
 using namespace osgEarth::Util::Controls;
 
@@ -123,6 +125,8 @@ int main(int argc, char** argv)
 {
     osg::ArgumentParser arguments(&argc,argv);
     osgViewer::Viewer viewer(arguments);
+	//viewer.getCamera()->setGraphicsContext(new EGLGraphicsWindowEmbedded);
+	//viewer.getCamera()->setViewport(new osg::Viewport(0, 0, 200, 200));
 
 	osg::Group* root = new osg::Group();
 	viewer.setSceneData(root);
@@ -150,7 +154,15 @@ int main(int argc, char** argv)
 	viewer.addEventHandler(new osgViewer::WindowSizeHandler());
 	viewer.addEventHandler(new osgViewer::ThreadingHandler());
 	viewer.addEventHandler(new osgGA::StateSetManipulator(viewer.getCamera()->getOrCreateStateSet()));
-
-	return viewer.run();
+	viewer.setThreadingModel(viewer.SingleThreaded);
+	
+	viewer.realize();
+	while(!viewer.done())
+	{
+		viewer.advance();
+		viewer.eventTraversal();
+		viewer.updateTraversal();
+		viewer.renderingTraversals();
+	}
 
 }
