@@ -15,8 +15,7 @@ install:
 build_script:
   - mkdir build
   - cd build
-  #- cmake .. -G "Visual Studio 15 2017 Win64" -DCMAKE_BUILD_TYPE=Release -DWIN32_USE_MP=ON -DCMAKE_INSTALL_PREFIX=c:\projects\osgearth\install -DCMAKE_TOOLCHAIN_FILE=c:/tools/vcpkg/scripts/buildsystems/vcpkg.cmake
-  - cmake .. -G "Visual Studio 15 2017 Win64" -DCMAKE_BUILD_TYPE=Release -DWIN32_USE_MP=ON -DCMAKE_INSTALL_PREFIX=c:\projects\osgearth\install -DCMAKE_TOOLCHAIN_FILE=c:/temp/osgearth-vcpkg-deps/scripts/buildsystems/vcpkg.cmake
+  - cmake .. -G "Visual Studio 16 2019 Win64" -DCMAKE_BUILD_TYPE=Release -DWIN32_USE_MP=ON -DCMAKE_INSTALL_PREFIX=c:\projects\osgearth\install -DCMAKE_TOOLCHAIN_FILE=c:/temp/osgearth-vcpkg-deps/scripts/buildsystems/vcpkg.cmake
   - cmake --build . --target INSTALL --config Release
   - cd ..\install
   - 7z a c:\projects\osgearth\osgearth.zip .
@@ -26,11 +25,5 @@ cache: c:\tools\vcpkg\installed\
 artifacts:
   - path: osgearth.zip
     name: osgearth
-
-notifications:
-  - provider: Slack
-    incoming_webhook:
-      secure: CeOwsQhxU4rvSp7EJrBWYhhfAhTFRMH/RxKYr2PBrAi3vk5hbMJBBYtvPAGtHMXp7k1E0JwbeC3rrtpVtg6wqbpplVMDSQZs+26H/LSY2so=
-
 
 
