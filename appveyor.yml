@@ -15,7 +15,7 @@ install:
 build_script:
   - mkdir build
   - cd build
-  - cmake .. -G "Visual Studio 16 2019 Win64" -DCMAKE_BUILD_TYPE=Release -DWIN32_USE_MP=ON -DCMAKE_INSTALL_PREFIX=c:\projects\osgearth\install -DCMAKE_TOOLCHAIN_FILE=c:/temp/osgearth-vcpkg-deps/scripts/buildsystems/vcpkg.cmake
+  - cmake .. -G "Visual Studio 16 2019" -A x64 -DCMAKE_BUILD_TYPE=Release -DWIN32_USE_MP=ON -DCMAKE_INSTALL_PREFIX=c:\projects\osgearth\install -DCMAKE_TOOLCHAIN_FILE=c:/temp/osgearth-vcpkg-deps/scripts/buildsystems/vcpkg.cmake
   - cmake --build . --target INSTALL --config Release
   - cd ..\install
   - 7z a c:\projects\osgearth\osgearth.zip .
