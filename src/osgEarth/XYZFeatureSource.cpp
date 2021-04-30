@@ -23,6 +23,7 @@
 #include <osgEarth/Filter>
 #include <osgEarth/MVT>
 #include <osgEarth/Registry>
+#include <osgEarth/Metrics>
 
 #define LC "[XYZFeatureSource] "
 
@@ -84,8 +85,8 @@ XYZFeatureSource::openImplementation()
 
     _template = options().url()->full();
 
-    _rotateStart = _template.find("[");
-    _rotateEnd = _template.find("]");
+    _rotateStart = _template.find('[');
+    _rotateEnd = _template.find(']');
     if (_rotateStart != std::string::npos && _rotateEnd != std::string::npos && _rotateEnd - _rotateStart > 1)
     {
         _rotateString = _template.substr(_rotateStart, _rotateEnd - _rotateStart + 1);
@@ -121,6 +122,8 @@ XYZFeatureSource::init()
 FeatureCursor*
 XYZFeatureSource::createFeatureCursorImplementation(const Query& query, ProgressCallback* progress)
 {
+    OE_PROFILING_ZONE;
+
     FeatureCursor* result = 0L;
 
     URI uri = createURL(query);
@@ -314,7 +317,7 @@ XYZFeatureSource::isJSON(const std::string& mime) const
 URI
 XYZFeatureSource::createURL(const Query& query)
 {
-    if (query.tileKey().isSet())
+    if (query.tileKey().isSet() && query.tileKey()->valid())
     {
         const TileKey &key = query.tileKey().get();
         unsigned int tileX = key.getTileX();

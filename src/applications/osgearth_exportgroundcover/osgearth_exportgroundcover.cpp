@@ -29,7 +29,6 @@
 #include <osgEarthSplat/GroundCoverLayer>
 #include <osgEarthSplat/NoiseTextureFactory>
 #include <osgEarthSplat/GroundCoverFeatureGenerator>
-#include <OpenThreads/Thread>
 
 #define LC "[exportgroundcover] "
 
@@ -167,15 +166,18 @@ main(int argc, char** argv)
     if (keys.empty())
         return usage(argv[0], "No data in extent");
 
-    osg::ref_ptr<ThreadPool> pool = new ThreadPool("GroundCover Export", 4u);
+    JobArena arena("GroundCover Export", 4u);
 
     std::cout << "Exporting " << keys.size() << " keys.." << std::endl;
 
-    for (std::vector<TileKey>::const_iterator i = keys.begin();
-        i != keys.end();
-        ++i)
+    for(const auto& key : keys)
     {
-        pool->run(new ExportOperation(app, *i));
+        Job().dispatch(
+            [&app, key](Cancelable*)
+            {
+                app.exportKey(key);
+            }
+        );
     }
 
     unsigned totalFeatures = 0u;

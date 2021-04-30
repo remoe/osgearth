@@ -173,7 +173,9 @@ _supportsVertexArrayObjects ( false )
         enableATIworkarounds = false;
 
     // logical CPUs (cores)
-    _numProcessors = OpenThreads::GetNumberOfProcessors();
+    _numProcessors = std::thread::hardware_concurrency();
+    if (_numProcessors <= 0)
+        _numProcessors = 4;
 
     // GLES compile?
 #if (defined(OSG_GLES1_AVAILABLE) || defined(OSG_GLES2_AVAILABLE) || defined(OSG_GLES3_AVAILABLE))
@@ -203,6 +205,10 @@ _supportsVertexArrayObjects ( false )
         const osg::GL2Extensions* GL2 = osg::GL2Extensions::Get( id, true );
 
         OE_INFO << LC << "  osgEarth Version:  " << osgEarthGetVersion() << std::endl;
+
+#ifdef OSGEARTH_EMBED_GIT_SHA
+        OE_INFO << LC << "  osgEarth HEAD SHA: " << osgEarthGitSHA1() << std::endl;
+#endif
 
         OE_INFO << LC << "  OSG Version:       " << osgGetVersion() << std::endl;
 

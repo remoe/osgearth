@@ -29,6 +29,7 @@
 #include <osgEarth/MVT>
 #include <osgEarth/OgrUtils>
 #include <osgEarth/FeatureCursor>
+#include <osgEarth/Metrics>
 
 #include <osg/Notify>
 #include <osgDB/FileNameUtils>
@@ -69,7 +70,7 @@ TFS::ReaderWriter::read(const URI& uri, const osgDB::ReaderWriter::Options *opti
     osgEarth::ReadResult result = uri.readString(options);
     if (result.succeeded())
     {
-        std::string str = result.getString();
+        const std::string& str = result.getString();
         std::stringstream in( str.c_str()  );
         return read( in, layer);
     }
@@ -257,6 +258,8 @@ TFSFeatureSource::openImplementation()
 FeatureCursor*
 TFSFeatureSource::createFeatureCursorImplementation(const Query& query, ProgressCallback* progress)
 {
+    OE_PROFILING_ZONE;
+
     FeatureCursor* result = 0L;
 
     std::string url = createURL(query);

@@ -25,7 +25,6 @@
 #include <osgEarth/OGRFeatureSource>
 #include <osgEarth/Feature>
 #include <osgEarth/TerrainTileModelFactory>
-#include <OpenThreads/Thread>
 
 #define LC "[clamp] "
 
@@ -119,10 +118,9 @@ struct App
         {
             Feature* f = cursor->nextFeature();
             GeoExtent e = f->getExtent();
-            point.vec3d() = e.getCentroid();
 
             ElevationSample sample = map->getElevationPool()->getSample(
-                point,
+                e.getCentroid(),
                 &workingSet);
             
             float value = sample.elevation().as(Units::METERS);

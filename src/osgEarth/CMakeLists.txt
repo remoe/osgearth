@@ -1,8 +1,11 @@
-IF   (DYNAMIC_OSGEARTH)
+# osgEarth Core Library
+
+IF(OSGEARTH_BUILD_SHARED_LIBS)
     ADD_DEFINITIONS(-DOSGEARTH_LIBRARY)
-ELSE (DYNAMIC_OSGEARTH)
+ELSE ()
     ADD_DEFINITIONS(-DOSGEARTH_LIBRARY_STATIC)
-ENDIF(DYNAMIC_OSGEARTH)
+ENDIF()
+
 # Add __STDC_FORMAT_MACROS for use of PRIu64 macro
 ADD_DEFINITIONS(-D__STDC_FORMAT_MACROS)
 
@@ -21,10 +24,11 @@ endif(OSGEARTH_ENABLE_NVTT_CPU_MIPMAPS)
 ADD_DEFINITIONS(-DTIXML_USE_STL)
 
 # Builds the HTTPClient with WIN_INET instead of CURL
-OPTION(OSGEARTH_USE_WININET_FOR_HTTP "Whether to use the WinInet library for HTTP requests (instead of cURL)" OFF)
-if (OSGEARTH_USE_WININET_FOR_HTTP)
+option(OSGEARTH_ENABLE_WININET_FOR_HTTP "Whether to use the WinInet library for HTTP requests (instead of cURL)" OFF)
+mark_as_advanced(OSGEARTH_ENABLE_WININET_FOR_HTTP)
+if (OSGEARTH_ENABLE_WININET_FOR_HTTP)
     ADD_DEFINITIONS(-DOSGEARTH_USE_WININET_FOR_HTTP)
-endif (OSGEARTH_USE_WININET_FOR_HTTP)
+endif ()
 
 IF(WIN32)
     IF(MSVC)
@@ -37,10 +41,10 @@ IF(WIN32)
     LIST(APPEND TARGET_EXTERNAL_LIBRARIES psapi)
 ENDIF(WIN32)
 
-# Generate the BuildConfig header
-if(CXX11_AVAILABLE)
-    set(OSGEARTH_CXX11_DEFINE "#define OSGEARTH_CXX11")
-endif()
+# Generate the BuildConfig header.
+# TODO: no longer need to do this since C++11 is required
+set(OSGEARTH_CXX11_DEFINE "#define OSGEARTH_CXX11")
+set(OSGEARTH_SOVERSION_VALUE "${OSGEARTH_SOVERSION}")
 set(OSGEARTH_BUILDCONFIG_HEADER "${OSGEARTH_BUILDTIME_INCLUDE_DIR}/osgEarth/BuildConfig.h")
 message(STATUS "Creating ${OSGEARTH_BUILDCONFIG_HEADER}")
 configure_file(
@@ -135,6 +139,7 @@ SET(LIB_PUBLIC_HEADERS
     Extension
     FadeEffect
     FileUtils
+    FrameClock
     GDAL
     GDALDEM
     GeoCommon
@@ -153,7 +158,6 @@ SET(LIB_PUBLIC_HEADERS
     ImageMosaic
     ImageToHeightFieldConverter
     ImageUtils
-    ImGuiUtils
     InstanceBuilder
     InstanceCloud
     IntersectionPicker
@@ -172,6 +176,7 @@ SET(LIB_PUBLIC_HEADERS
     LocalTangentPlane
     Math
     Map
+    MapboxGLImageLayer
     MapCallback
     MapInfo
     MapModelChange
@@ -235,6 +240,7 @@ SET(LIB_PUBLIC_HEADERS
     TerrainTileNode
     Tessellator
     Text
+    TextureBuffer
     ThreeDTilesLayer
     TileKey
     TileLayer
@@ -248,7 +254,6 @@ SET(LIB_PUBLIC_HEADERS
     TileVisitor
     TileCache
     TimeControl
-    TraversalData
     Threading
     TMS
     Units
@@ -315,6 +320,7 @@ SET(LIB_PUBLIC_HEADERS
     ViewFitter
 
     AltitudeFilter
+    AttributesFilter
     BufferFilter
     BuildGeometryFilter
     BuildTextFilter
@@ -328,6 +334,7 @@ SET(LIB_PUBLIC_HEADERS
     FeatureDisplayLayout
     FeatureElevationLayer
     FeatureImageLayer
+    FeatureRasterizer
     FeatureIndex
     TerrainConstraintLayer
     FeatureModelGraph
@@ -434,6 +441,21 @@ SET(LIB_PUBLIC_HEADERS
 
     FileGDBFeatureSource
 
+    SDF
+
+    ImGui/ImGui
+    ImGui/OsgImGuiHandler
+    ImGui/LayersGUI
+    ImGui/NetworkMonitorGUI
+    ImGui/NotifyGUI
+    ImGui/SceneGraphGUI
+    ImGui/SearchGUI
+    ImGui/TextureInspectorGUI
+    ImGui/ViewpointsGUI
+    ImGui/SystemGUI
+    ImGui/EphemerisGUI
+    ImGui/TerrainGUI
+
     ${OSGEARTH_BUILDCONFIG_HEADER}
 )
 
@@ -458,17 +480,26 @@ ENDIF (NOT TINYXML_FOUND)
 
 
 SET(VERSION_GIT_SOURCE "")
-IF (OSGEARTH_EMBED_GIT_SHA)
-	ADD_DEFINITIONS(-DOSGEARTH_EMBED_GIT_SHA)
+find_package(git)
+if (GIT_FOUND)
+    option(OSGEARTH_EMBED_GIT_SHA "Encode the SHA in the Version header code" OFF)
+    if(OSGEARTH_EMBED_GIT_SHA)
+        include(GetGitRevisionDescription)
+        get_git_head_revision(GIT_REFSPEC OSGEARTH_GIT_SHA1)
+        if(OSGEARTH_GIT_SHA1)
+            message(STATUS "Embedding git SHA = ${OSGEARTH_GIT_SHA1}")
+            ADD_DEFINITIONS(-DOSGEARTH_EMBED_GIT_SHA)
 
-	# auto-generate the VersionGit file to include the git SHA1 variable.
-	configure_file(
-		"${CMAKE_CURRENT_SOURCE_DIR}/VersionGit.cpp.in"
-		"${CMAKE_CURRENT_BINARY_DIR}/VersionGit.cpp"
-		@ONLY)
+            # auto-generate the VersionGit file to include the git SHA1 variable.
+            configure_file(
+                "${CMAKE_CURRENT_SOURCE_DIR}/VersionGit.cpp.in"
+                "${CMAKE_CURRENT_BINARY_DIR}/VersionGit.cpp"
+                @ONLY)
 
-	set(VERSION_GIT_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/VersionGit.cpp")
-ENDIF (OSGEARTH_EMBED_GIT_SHA)
+            set(VERSION_GIT_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/VersionGit.cpp")
+        endif()
+    endif()
+endif()
 
 set(TARGET_SRC
     ArcGISServer.cpp
@@ -513,6 +544,7 @@ set(TARGET_SRC
     Extension.cpp
     FadeEffect.cpp
     FileUtils.cpp
+    FrameClock.cpp
     GDAL.cpp
     GDALDEM.cpp
     GeoData.cpp
@@ -545,6 +577,7 @@ set(TARGET_SRC
     LocalTangentPlane.cpp
     Math.cpp
     Map.cpp
+    MapboxGLImageLayer.cpp
     MapCallback.cpp
     MapInfo.cpp
     MapNode.cpp
@@ -595,6 +628,7 @@ set(TARGET_SRC
     TerrainTileModelFactory.cpp
     Tessellator.cpp
     Text.cpp
+    TextureBuffer.cpp
     ThreeDTilesLayer.cpp
     TextureBufferSerializer.cpp
     TileKey.cpp
@@ -609,7 +643,6 @@ set(TARGET_SRC
     TileSourceImageLayer.cpp
     TileCache.cpp
     TimeControl.cpp
-    TraversalData.cpp
     Threading.cpp
     TMS.cpp
     Units.cpp
@@ -669,6 +702,7 @@ set(TARGET_SRC
     ViewFitter.cpp
 
     AltitudeFilter.cpp
+    AttributesFilter.cpp
     BufferFilter.cpp
     BuildGeometryFilter.cpp
     BuildTextFilter.cpp
@@ -681,6 +715,7 @@ set(TARGET_SRC
     FeatureDisplayLayout.cpp
     FeatureElevationLayer.cpp
     FeatureImageLayer.cpp
+    FeatureRasterizer.cpp
     TerrainConstraintLayer.cpp
     FeatureModelGraph.cpp
     FeatureModelLayer.cpp
@@ -772,6 +807,8 @@ set(TARGET_SRC
     TrackNode.cpp
     WindLayer.cpp
 
+    SDF.cpp
+
     FileGDBFeatureSource.cpp
 
     ${SHADERS_CPP}
@@ -800,9 +837,10 @@ if(OSGEARTH_ENABLE_GEOCODER)
     set(LIB_PUBLIC_HEADERS ${LIB_PUBLIC_HEADERS} Geocoder)
 endif()
 
+message(STATUS "Building ${LIB_NAME} as a ${OSGEARTH_DYNAMIC_OR_STATIC} library")
 
-ADD_LIBRARY(
-    ${LIB_NAME} ${OSGEARTH_USER_DEFINED_DYNAMIC_OR_STATIC}
+ADD_LIBRARY(${LIB_NAME}
+    ${OSGEARTH_DYNAMIC_OR_STATIC}
     ${LIB_PUBLIC_HEADERS}
     ${TINYXML_SRC}
     ${VERSION_GIT_SOURCE}
@@ -852,6 +890,12 @@ IF(FILEGDB_FOUND)
     LINK_WITH_VARIABLES(${LIB_NAME} FILEGDB_LIBRARY)
 ENDIF()
 
+IF(BLEND2D_FOUND)
+    add_definitions(-DOSGEARTH_HAVE_BLEND2D)
+    include_directories(${BLEND2D_INCLUDES})
+    link_with_variables(${LIB_NAME} BLEND2D_LIBRARY)
+ENDIF()
+
 IF (WIN32)
   LINK_EXTERNAL(${LIB_NAME} ${TARGET_EXTERNAL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${MATH_LIBRARY} )
 ELSE(WIN32)
@@ -865,9 +909,9 @@ ENDIF(TRACY_FOUND)
 
 OPTION(NRL_STATIC_LIBRARIES "Link osgEarth against static GDAL and cURL, including static OpenSSL, Proj4, JPEG, PNG, and TIFF." OFF)
 if(NOT NRL_STATIC_LIBRARIES)
-  LINK_WITH_VARIABLES(${LIB_NAME} OSG_LIBRARY OSGUTIL_LIBRARY OSGSIM_LIBRARY OSGDB_LIBRARY OSGVIEWER_LIBRARY OSGTEXT_LIBRARY OSGGA_LIBRARY OSGSHADOW_LIBRARY OPENTHREADS_LIBRARY CURL_LIBRARY GDAL_LIBRARY OSGMANIPULATOR_LIBRARY)
+  LINK_WITH_VARIABLES(${LIB_NAME} OSG_LIBRARY OSGUTIL_LIBRARY OSGSIM_LIBRARY OSGDB_LIBRARY OSGVIEWER_LIBRARY OSGTEXT_LIBRARY OSGGA_LIBRARY OSGSHADOW_LIBRARY CURL_LIBRARY GDAL_LIBRARY OSGMANIPULATOR_LIBRARY)
 else(NOT NRL_STATIC_LIBRARIES)
-  LINK_WITH_VARIABLES(${LIB_NAME} OSG_LIBRARY OSGUTIL_LIBRARY OSGSIM_LIBRARY OSGDB_LIBRARY OSGVIEWER_LIBRARY OSGTEXT_LIBRARY OSGGA_LIBRARY OSGSHADOW_LIBRARY OPENTHREADS_LIBRARY CURL_LIBRARY GDAL_LIBRARY OSGMANIPULATOR_LIBRARY SSL_EAY_RELEASE LIB_EAY_RELEASE TIFF_LIBRARY PROJ4_LIBRARY PNG_LIBRARY JPEG_LIBRARY)
+  LINK_WITH_VARIABLES(${LIB_NAME} OSG_LIBRARY OSGUTIL_LIBRARY OSGSIM_LIBRARY OSGDB_LIBRARY OSGVIEWER_LIBRARY OSGTEXT_LIBRARY OSGGA_LIBRARY OSGSHADOW_LIBRARY CURL_LIBRARY GDAL_LIBRARY OSGMANIPULATOR_LIBRARY SSL_EAY_RELEASE LIB_EAY_RELEASE TIFF_LIBRARY PROJ4_LIBRARY PNG_LIBRARY JPEG_LIBRARY)
 endif(NOT NRL_STATIC_LIBRARIES)
 
 LINK_CORELIB_DEFAULT(${LIB_NAME} ${CMAKE_THREAD_LIBS_INIT} ${MATH_LIBRARY})

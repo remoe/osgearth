@@ -27,6 +27,7 @@
 #include <osgEarth/Revisioning>
 #include <osgEarth/Threading>
 #include <osgEarth/ElevationPool>
+#include <osgEarth/Cache>
 #include <osgDB/Options>
 #include <functional>
 
@@ -45,6 +46,9 @@ namespace osgEarth
 
         //! Construct a new, empty map.
         Map();
+
+        //! Construct a new, empty map with custom read options.
+        Map(const osgDB::Options* readOptions);
 
         //! This Map's unique ID
         UID getUID() const { return _uid; }
@@ -189,6 +193,9 @@ namespace osgEarth
         //! List of attribution strings to be displayed by the application
         void getAttributions(StringSet& attributions) const;
 
+        //! Number of layers marked as terrain pathes
+        int getNumTerrainPatchLayers() const;
+
     protected:
 
         virtual ~Map();
@@ -212,13 +219,14 @@ namespace osgEarth
         };
 
         //! Internal - create from serialized options
-        Map(const Map::Options& options);
+        Map(
+            const Map::Options& options,
+            const osgDB::Options* readOptions);
 
         //! Ready-only access to the serialization options for this map
         const Options& options() const { return _optionsConcrete; }
 
     private:
-
         UID _uid;
         std::string _name;
         LayerVector _layers;
@@ -230,6 +238,8 @@ namespace osgEarth
         osg::ref_ptr<osgDB::Options> _readOptions;
         osg::ref_ptr<ElevationPool> _elevationPool;
         mutable ElevationPool _ElevationPool;
+        osg::ref_ptr<CacheSettings> _cacheSettings;
+        int _numTerrainPatchLayers;
 
         struct LayerCB : public LayerCallback {
             LayerCB(Map*);

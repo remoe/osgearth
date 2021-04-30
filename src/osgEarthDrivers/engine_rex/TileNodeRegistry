@@ -26,7 +26,7 @@
 #include <osgEarth/ResourceReleaser>
 #include <osgEarth/Containers>
 #include <osgEarth/TerrainTileModelFactory>
-#include <OpenThreads/Atomic>
+#include <osgEarth/FrameClock>
 #include <osgUtil/RenderBin>
 
 namespace osgEarth { namespace REX

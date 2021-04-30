@@ -22,6 +22,7 @@
 #include <osgEarth/SceneGraphCallback>
 #include <osgEarth/ShaderLoader>
 #include <osgEarth/TileKey>
+#include <osgEarth/TerrainEngineNode>
 #include <osgEarth/TerrainResources>
 #include <osg/StateSet>
 
@@ -44,6 +45,8 @@ Layer::Options::getConfig() const
     conf.set("attribution", attribution());
     conf.set("terrain", terrainPatch());
     conf.set("proxy", _proxySettings );
+    conf.set("osg_options", osgOptionString());
+    conf.set("l2_cache_size", l2CacheSize());
 
     for(std::vector<ShaderOptions>::const_iterator i = shaders().begin();
         i != shaders().end();
@@ -68,6 +71,7 @@ Layer::Options::fromConfig(const Config& conf)
     conf.get("cacheid", cacheId());
     conf.get("attribution", attribution());
     conf.get("cache_policy", cachePolicy());
+    conf.get("l2_cache_size", l2CacheSize());
 
     // legacy support:
     if (!cachePolicy().isSet())
@@ -86,6 +90,7 @@ Layer::Options::fromConfig(const Config& conf)
     conf.get("terrain", terrainPatch());
     conf.get("patch", terrainPatch());
     conf.get("proxy", _proxySettings );
+    conf.get("osg_options", osgOptionString());
 }
 
 //.................................................................
@@ -153,6 +158,13 @@ Layer::setReadOptions(const osgDB::Options* readOptions)
     if (options().proxySettings().isSet())
     {
         options().proxySettings()->apply(_readOptions.get());
+    }
+
+    if (options().osgOptionString().isSet())
+    {
+        _readOptions->setOptionString(
+            options().osgOptionString().get() + " " +
+            _readOptions->getOptionString());
     }
 }
 
@@ -282,7 +294,7 @@ Layer::init()
     _mutex = new Threading::Mutex(options().name().isSet() ? options().name().get() : "Unnamed Layer(OE)");
 }
 
-const Status&
+Status
 Layer::open()
 {
     // Cannot open a layer that's already open OR is disabled.
@@ -317,7 +329,7 @@ Layer::open()
     return getStatus();
 }
 
-const Status&
+Status
 Layer::open(const osgDB::Options* readOptions)
 {
     setReadOptions(readOptions);
@@ -400,16 +412,24 @@ Layer::getStatus() const
 }
 
 void
-Layer::setTerrainResources(TerrainResources* res)
+Layer::invoke_prepareForRendering(TerrainEngine* engine)
+{
+    prepareForRendering(engine);
+
+    // deprecation path; call this in case some older layer is still
+    // implementing it.
+    setTerrainResources(engine->getResources());
+}
+
+void
+Layer::prepareForRendering(TerrainEngine* engine)
 {
     // Install an earth-file shader if necessary (once)
-    for(std::vector<ShaderOptions>::const_iterator i = options().shaders().begin();
-        i != options().shaders().end();
-        ++i)
+    for (const auto& shaderOptions : options().shaders())
     {
-        LayerShader* shader = new LayerShader(*i);
-        shader->install(this, res);
-        _shaders.push_back(shader);
+        LayerShader* shader = new LayerShader(shaderOptions);
+        shader->install(this, engine->getResources());
+        _shaders.emplace_back(shader);
     }
 }
 
@@ -607,4 +627,10 @@ Layer::Hints&
 Layer::layerHints()
 {
     return _hints;
+}
+
+const std::string&
+Layer::getOsgOptionString() const
+{
+    return options().osgOptionString().get();
 }

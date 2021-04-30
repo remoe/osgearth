@@ -18,7 +18,9 @@
  */
 #include <osgEarth/VisibleLayer>
 #include <osgEarth/VirtualProgram>
+#include <osgEarth/Utils>
 #include <osg/BlendFunc>
+#include <osgUtil/RenderBin>
 
 using namespace osgEarth;
 
@@ -27,6 +29,40 @@ using namespace osgEarth;
 namespace
 {
     static osg::Node::NodeMask DEFAULT_LAYER_MASK = 0xffffffff;
+
+    struct EmptyRenderBin : public osgUtil::RenderBin
+    {
+        EmptyRenderBin(osgUtil::RenderStage* stage) :
+            osgUtil::RenderBin()
+        {
+            setName("OE_EMPTY_RENDER_BIN");
+            _stage = stage;
+        }
+    };
+
+    // Cull callback that will permit culling but will supress rendering.
+    // We use this to toggle node visibility to that paged scene graphs
+    // will continue to page in/out even when the layer is not visible.
+    struct NoDrawCullCallback : public osg::NodeCallback
+    {
+        void operator()(osg::Node* node, osg::NodeVisitor* nv) override
+        {
+            osgUtil::CullVisitor* cv = dynamic_cast<osgUtil::CullVisitor*>(nv);
+            osg::ref_ptr<osgUtil::RenderBin> savedBin;
+            if (cv)
+            {
+                savedBin = cv->getCurrentRenderBin();
+                cv->setCurrentRenderBin(new EmptyRenderBin(savedBin->getStage()));
+            }
+
+            traverse(node, nv);
+
+            if (cv)
+            {
+                cv->setCurrentRenderBin(savedBin.get());
+            }
+        }
+    };
 }
 
 //------------------------------------------------------------------------
@@ -110,7 +146,24 @@ VisibleLayer::setVisible(bool value)
     // if this layer has a scene graph node, toggle its node mask
     osg::Node* node = getNode();
     if (node)
-        node->setNodeMask(value? getMask() : 0);
+    {
+        if (value == true)
+        {
+            if (_noDrawCallback.valid())
+            {
+                node->removeCullCallback(_noDrawCallback.get());
+                _noDrawCallback = nullptr;
+            }
+        }
+        else
+        {
+            if (!_noDrawCallback.valid())
+            {
+                _noDrawCallback = new NoDrawCullCallback();
+                node->addCullCallback(_noDrawCallback.get());
+            }
+        }
+    }
 
     fireCallback(&VisibleLayerCallback::onVisibleChanged);
 }
