@@ -15,13 +15,7 @@ find_package(SQLite3 REQUIRED)
 
 # optional
 find_package(geos QUIET)
-IF(APPLE)
-    # support of newer protobuf cmake - module
-    set(protobuf_MODULE_COMPATIBLE ON CACHE BOOL "")
-    find_package(Protobuf REQUIRED CONFIG)
-else()
-    find_package(Protobuf QUIET)
-endif()
+find_package(Protobuf QUIET)
 
 find_package(Protobuf QUIET)
 find_package(blend2d QUIET)

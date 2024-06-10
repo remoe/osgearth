@@ -21,7 +21,9 @@ jobs:
     steps:
     - name: Setup environment
       run: |
-        # brew install cmake
+        cmake --version
+        brew install cmake
+        cmake --version
         brew install gdal
         brew install geos
         brew install sqlite
